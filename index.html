@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>LiftLog - Bitácora de Entrenamiento</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+  <!-- Dexie.js CDN -->
+  <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <!-- App Container -->
+  <div class="app-container">
+    
+    <!-- Top Header -->
+    <header class="app-header">
+      <div class="logo">
+        <i data-lucide="dumbbell" class="logo-icon"></i>
+        <h1>Lift<span>Log</span></h1>
+      </div>
+      <div class="header-actions">
+        <!-- Quick status or simple notifications if needed -->
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="app-content">
+      
+      <!-- VIEW: WORKOUTS -->
+      <section id="view-workouts" class="view-section active">
+        <!-- Active Workout Screen (shown when a workout is in progress) -->
+        <div id="active-workout-container" class="hidden">
+          <div class="section-header">
+            <h2>Entrenamiento en Curso</h2>
+            <div class="header-buttons">
+              <button id="btn-cancel-workout" class="btn btn-danger btn-sm" title="Cancelar">
+                <i data-lucide="trash-2"></i>
+              </button>
+              <button id="btn-finish-workout" class="btn btn-success btn-sm">
+                <i data-lucide="check"></i> Terminar
+              </button>
+            </div>
+          </div>
+
+          <div class="card active-workout-meta">
+            <div class="form-group">
+              <label for="workout-name">Nombre del Entrenamiento</label>
+              <input type="text" id="workout-name" placeholder="Ej. Empuje / Fuerza">
+            </div>
+            <div class="form-group">
+              <label for="workout-date">Fecha y Hora</label>
+              <input type="datetime-local" id="workout-date">
+            </div>
+          </div>
+
+          <div id="active-workout-exercises" class="exercises-log-list">
+            <!-- Dynamically populated with active exercises -->
+          </div>
+
+          <div class="active-workout-actions">
+            <button id="btn-add-exercise-to-workout" class="btn btn-secondary btn-block">
+              <i data-lucide="plus"></i> Agregar Ejercicio
+            </button>
+          </div>
+        </div>
+
+        <!-- Default Workouts Home (when no workout is in progress) -->
+        <div id="workouts-home-container">
+          <div class="hero-card">
+            <div class="hero-content">
+              <h3>¿Listo para entrenar?</h3>
+              <p>Registra tus series, repeticiones y peso para ver tu progreso.</p>
+              <button id="btn-start-workout" class="btn btn-primary btn-lg">
+                <i data-lucide="plus-circle"></i> Iniciar Entrenamiento
+              </button>
+            </div>
+          </div>
+
+          <div class="section-header">
+            <h2>Historial de Entrenamientos</h2>
+          </div>
+          
+          <div id="workouts-history-list" class="history-list">
+            <!-- Dynamically populated with past workouts -->
+            <div class="empty-state">
+              <i data-lucide="calendar"></i>
+              <p>No hay entrenamientos registrados aún.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW: EXERCISES -->
+      <section id="view-exercises" class="view-section">
+        <div class="section-header">
+          <h2>Ejercicios</h2>
+          <button id="btn-show-add-exercise" class="btn btn-primary btn-sm">
+            <i data-lucide="plus"></i> Nuevo
+          </button>
+        </div>
+
+        <!-- Add Exercise Form (hidden by default) -->
+        <div id="add-exercise-form-card" class="card hidden mb-4">
+          <h3>Crear Nuevo Ejercicio</h3>
+          <div class="form-row">
+            <input type="text" id="new-exercise-name" placeholder="Ej. Sentadilla con Barra">
+            <div class="form-buttons">
+              <button id="btn-cancel-add-exercise" class="btn btn-secondary">Cancelar</button>
+              <button id="btn-save-exercise" class="btn btn-primary">Guardar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="search-bar">
+          <i data-lucide="search"></i>
+          <input type="text" id="exercise-search" placeholder="Buscar ejercicio...">
+        </div>
+
+        <div id="exercises-list" class="exercise-list-group">
+          <!-- Dynamically populated with exercises -->
+        </div>
+      </section>
+
+      <!-- VIEW: PROGRESS (CHARTS) -->
+      <section id="view-progress" class="view-section">
+        <div class="section-header">
+          <h2>Progreso y Estadísticas</h2>
+        </div>
+
+        <div class="stats-overview">
+          <div class="stats-card">
+            <span class="stats-label">Total Entrenamientos</span>
+            <span id="stat-total-workouts" class="stats-value">0</span>
+          </div>
+          <div class="stats-card">
+            <span class="stats-label">Volumen Semanal (kg)</span>
+            <span id="stat-weekly-volume" class="stats-value">0</span>
+          </div>
+        </div>
+
+        <!-- Volume Chart -->
+        <div class="card chart-card mb-4">
+          <h3>Volumen Total por Sesión</h3>
+          <div class="chart-container">
+            <canvas id="chart-volume"></canvas>
+          </div>
+        </div>
+
+        <!-- Exercise Specific Progress Chart -->
+        <div class="card chart-card mb-4">
+          <h3>Progreso por Ejercicio</h3>
+          <div class="form-group">
+            <label for="progress-exercise-select">Selecciona un Ejercicio</label>
+            <select id="progress-exercise-select">
+              <option value="">-- Elige un ejercicio --</option>
+            </select>
+          </div>
+          <div class="chart-tabs">
+            <button class="chart-tab-btn active" data-metric="1rm">Est. 1RM</button>
+            <button class="chart-tab-btn" data-metric="max-weight">Peso Máx</button>
+            <button class="chart-tab-btn" data-metric="volume">Volumen</button>
+          </div>
+          <div class="chart-container mt-2">
+            <canvas id="chart-exercise-progress"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW: WEIGHT -->
+      <section id="view-weight" class="view-section">
+        <div class="section-header">
+          <h2>Peso Corporal</h2>
+          <button id="btn-show-add-weight" class="btn btn-primary btn-sm">
+            <i data-lucide="plus"></i> Registrar Peso
+          </button>
+        </div>
+
+        <!-- Log Weight Form (hidden by default) -->
+        <div id="add-weight-form-card" class="card hidden mb-4">
+          <h3>Registrar Peso Corporal</h3>
+          <div class="form-group">
+            <label for="weight-value">Peso (kg)</label>
+            <input type="number" step="0.1" id="weight-value" placeholder="Ej. 78.5">
+          </div>
+          <div class="form-group">
+            <label for="weight-date">Fecha</label>
+            <input type="date" id="weight-date">
+          </div>
+          <div class="form-buttons">
+            <button id="btn-cancel-add-weight" class="btn btn-secondary">Cancelar</button>
+            <button id="btn-save-weight" class="btn btn-primary">Registrar</button>
+          </div>
+        </div>
+
+        <!-- Bodyweight Chart -->
+        <div class="card chart-card mb-4">
+          <h3>Evolución del Peso</h3>
+          <div class="chart-container">
+            <canvas id="chart-bodyweight"></canvas>
+          </div>
+        </div>
+
+        <!-- Weight History Table -->
+        <div class="card">
+          <h3>Historial de Peso</h3>
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Peso (kg)</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="weight-history-tbody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW: SETTINGS -->
+      <section id="view-settings" class="view-section">
+        <div class="section-header">
+          <h2>Ajustes</h2>
+        </div>
+
+        <!-- Backup Card -->
+        <div class="card mb-4">
+          <h3>Copia de Seguridad (Backup)</h3>
+          <p class="text-muted mb-3">Exporta todos tus entrenamientos, ejercicios y pesos a un archivo JSON local, o restáuralos en este u otro dispositivo.</p>
+          <div class="backup-buttons">
+            <button id="btn-export-json" class="btn btn-primary">
+              <i data-lucide="download"></i> Exportar JSON
+            </button>
+            <button id="btn-trigger-import" class="btn btn-secondary">
+              <i data-lucide="upload"></i> Importar JSON
+            </button>
+            <input type="file" id="import-json-file" accept=".json" class="hidden">
+          </div>
+        </div>
+
+        <!-- Preset Exercises -->
+        <div class="card mb-4">
+          <h3>Cargar Ejercicios Predeterminados</h3>
+          <p class="text-muted mb-3">Agrega una lista base de ejercicios comunes (Pecho, Espalda, Piernas, Hombros) si tu base de datos está vacía.</p>
+          <button id="btn-load-presets" class="btn btn-secondary">
+            <i data-lucide="database"></i> Cargar Predeterminados
+          </button>
+        </div>
+
+        <!-- Clear DB -->
+        <div class="card border-danger">
+          <h3 class="text-danger">Zona de Peligro</h3>
+          <p class="text-muted mb-3">Esto borrará permanentemente todos los entrenamientos, sets, ejercicios y datos guardados en este navegador.</p>
+          <button id="btn-clear-db" class="btn btn-danger">
+            <i data-lucide="alert-triangle"></i> Borrar Todos los Datos
+          </button>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Bottom Navigation Bar (Mobile Friendly) -->
+    <nav class="app-nav">
+      <button class="nav-item active" data-view="workouts">
+        <i data-lucide="calendar"></i>
+        <span>Bitácora</span>
+      </button>
+      <button class="nav-item" data-view="exercises">
+        <i data-lucide="dumbbell"></i>
+        <span>Ejercicios</span>
+      </button>
+      <button class="nav-item" data-view="progress">
+        <i data-lucide="trending-up"></i>
+        <span>Progreso</span>
+      </button>
+      <button class="nav-item" data-view="weight">
+        <i data-lucide="scale"></i>
+        <span>Peso</span>
+      </button>
+      <button class="nav-item" data-view="settings">
+        <i data-lucide="settings"></i>
+        <span>Ajustes</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- MODALS -->
+
+  <!-- Modal: Select Exercise for Active Workout -->
+  <div id="modal-select-exercise" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Seleccionar Ejercicio</h3>
+        <button class="modal-close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="search-bar mb-3">
+          <i data-lucide="search"></i>
+          <input type="text" id="modal-exercise-search" placeholder="Buscar ejercicio...">
+        </div>
+        <div id="modal-exercises-list" class="modal-exercise-list">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-modal-create-exercise" class="btn btn-primary btn-block">
+          <i data-lucide="plus"></i> Crear Ejercicio Nuevo
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Workout Details View (History) -->
+  <div id="modal-workout-details" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="details-workout-name">Detalle del Entrenamiento</h3>
+        <button class="modal-close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body" id="details-workout-body">
+        <!-- Dynamically populated -->
+      </div>
+      <div class="modal-footer justify-between">
+        <button id="btn-details-delete-workout" class="btn btn-danger">
+          <i data-lucide="trash-2"></i> Eliminar
+        </button>
+        <button class="btn btn-secondary modal-close-btn">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main JavaScript File -->
+  <script src="app.js"></script>
+</body>
+</html>
