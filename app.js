@@ -43,27 +43,27 @@ const DEFAULT_EXERCISES = [
   
   // Hombros / Deltoides
   { name: 'Elevaciones Laterales', primaryMuscle: 'deltoides lateral', secondaryMuscles: ['deltoides anterior'] },
-  { name: 'Press militar', primaryMuscle: 'deltoides anterior', secondaryMuscles: ['deltoides lateral', 'pecho'] },
+  { name: 'Press Militar', primaryMuscle: 'deltoides anterior', secondaryMuscles: ['deltoides lateral', 'pecho'] },
   
   // Brazos
   { name: 'Curl de Biceps con Barra', primaryMuscle: 'biceps', secondaryMuscles: [] },
   { name: 'Curl Martillo', primaryMuscle: 'biceps', secondaryMuscles: ['antebrazo'] },
-  { name: 'Extensión de triceps', primaryMuscle: 'triceps', secondaryMuscles: [] },
+  { name: 'Extensión de Triceps', primaryMuscle: 'triceps', secondaryMuscles: [] },
   { name: 'Press Frances con Barra', primaryMuscle: 'triceps', secondaryMuscles: [] },
-  { name: 'Press frances con mancuerna', primaryMuscle: 'triceps', secondaryMuscles: [] },
+  { name: 'Press Frances con Mancuerna', primaryMuscle: 'triceps', secondaryMuscles: [] },
   
   // Piernas
   { name: 'Sentadilla con Barra', primaryMuscle: 'cuadriceps', secondaryMuscles: ['gluteos', 'espalda baja'] },
-  { name: 'Peso muerto rumano', primaryMuscle: 'isquiosurales', secondaryMuscles: ['gluteos', 'espalda baja', 'antebrazo'] },
+  { name: 'Peso Muerto Rumano', primaryMuscle: 'isquiosurales', secondaryMuscles: ['gluteos', 'espalda baja', 'antebrazo'] },
   { name: 'Prensa 45', primaryMuscle: 'cuadriceps', secondaryMuscles: ['gluteos'] },
   { name: 'Extension de Cuadriceps', primaryMuscle: 'cuadriceps', secondaryMuscles: [] },
   { name: 'Curl Femoral', primaryMuscle: 'isquiosurales', secondaryMuscles: [] },
-  { name: 'Elevacion de talones', primaryMuscle: 'pantorrilla', secondaryMuscles: [] },
+  { name: 'Elevaciones de Talones', primaryMuscle: 'pantorrilla', secondaryMuscles: [] },
   
   // Abdomen
-  { name: 'Elevacion de piernas', primaryMuscle: 'abdomen', secondaryMuscles: [] },
-  { name: 'Rueda abdominal', primaryMuscle: 'abdomen', secondaryMuscles: [] },
-  { name: 'Crunch en polea', primaryMuscle: 'abdomen', secondaryMuscles: [] }
+  { name: 'Elevaciones de Piernas', primaryMuscle: 'abdomen', secondaryMuscles: [] },
+  { name: 'Rueda Abdominal', primaryMuscle: 'abdomen', secondaryMuscles: [] },
+  { name: 'Crunch en Polea', primaryMuscle: 'abdomen', secondaryMuscles: [] }
 ];
 
 // 2. STATE VARIABLES
