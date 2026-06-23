@@ -274,15 +274,19 @@ function renderExerciseLogCard(exercise, sets = []) {
         <i data-lucide="trash-2"></i>
       </button>
     </div>
-    <div class="sets-table-header">
-      <span>Set</span>
-      <span>Peso (kg)</span>
-      <span>Reps</span>
-      <span></span>
-    </div>
-    <div class="sets-list" id="sets-list-${exercise.id}">
-      <!-- Dynamically filled with set rows -->
-    </div>
+    <table class="sets-table">
+      <thead>
+        <tr>
+          <th style="width: 15%;">Set</th>
+          <th style="width: 42%;">Peso (kg)</th>
+          <th style="width: 33%;">Reps</th>
+          <th style="width: 10%;"></th>
+        </tr>
+      </thead>
+      <tbody id="sets-list-${exercise.id}">
+        <!-- Dynamically filled with tr rows -->
+      </tbody>
+    </table>
     <button class="btn btn-secondary btn-block btn-sm btn-add-set-row" data-exercise-id="${exercise.id}">
       <i data-lucide="plus"></i> Agregar Serie
     </button>
@@ -314,16 +318,21 @@ function renderExerciseLogCard(exercise, sets = []) {
 }
 
 function renderSetRow(container, exerciseId, set, setNumber) {
-  const row = document.createElement('div');
-  row.className = 'set-row';
+  const row = document.createElement('tr');
   row.id = `set-row-${set.id}`;
   row.innerHTML = `
-    <div class="set-number-badge">${setNumber}</div>
-    <input type="number" step="0.5" class="set-weight" placeholder="0" value="${set.weight !== undefined ? set.weight : ''}" data-set-id="${set.id}">
-    <input type="number" class="set-reps" placeholder="0" value="${set.reps !== undefined ? set.reps : ''}" data-set-id="${set.id}">
-    <button class="btn-delete-set" data-set-id="${set.id}" data-exercise-id="${exerciseId}">
-      <i data-lucide="x"></i>
-    </button>
+    <td class="set-num-cell">${setNumber}</td>
+    <td class="input-cell">
+      <input type="number" step="0.5" class="set-weight" placeholder="0" value="${set.weight !== undefined ? set.weight : ''}" data-set-id="${set.id}">
+    </td>
+    <td class="input-cell">
+      <input type="number" class="set-reps" placeholder="0" value="${set.reps !== undefined ? set.reps : ''}" data-set-id="${set.id}">
+    </td>
+    <td class="action-cell">
+      <button class="btn-delete-set" data-set-id="${set.id}" data-exercise-id="${exerciseId}">
+        <i data-lucide="x"></i>
+      </button>
+    </td>
   `;
 
   container.appendChild(row);
@@ -1130,23 +1139,32 @@ async function openWorkoutDetailsModal(workoutId) {
     const card = document.createElement('div');
     card.className = 'details-exercise-card';
     
-    let setsHTML = '';
+    let setsRowsHTML = '';
     // Sort sets
     exerciseSets.sort((a, b) => a.id - b.id).forEach((s, idx) => {
-      setsHTML += `
-        <div class="details-set-row">
-          <span style="font-weight:600;color:var(--text-muted);">Serie ${idx+1}</span>
-          <span style="text-align:center;">${s.weight} kg</span>
-          <span style="text-align:right;">${s.reps} reps</span>
-        </div>
+      setsRowsHTML += `
+        <tr>
+          <td class="set-num-cell">${idx + 1}</td>
+          <td style="text-align:center; padding: 6px;">${s.weight !== undefined ? s.weight + ' kg' : '-'}</td>
+          <td style="text-align:center; padding: 6px;">${s.reps !== undefined ? s.reps + ' reps' : '-'}</td>
+        </tr>
       `;
     });
 
     card.innerHTML = `
-      <div class="details-exercise-title">${exercise ? exercise.name : 'Ejercicio Eliminado'}</div>
-      <div class="details-sets-container">
-        ${setsHTML}
-      </div>
+      <div class="details-exercise-title" style="margin-bottom: 6px; font-weight:600; font-size:13px; color:var(--accent-primary-light);">${exercise ? exercise.name : 'Ejercicio Eliminado'}</div>
+      <table class="sets-table" style="margin-bottom: 0;">
+        <thead>
+          <tr>
+            <th style="width: 20%; padding: 4px;">Set</th>
+            <th style="width: 40%; padding: 4px;">Peso</th>
+            <th style="width: 40%; padding: 4px;">Reps</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${setsRowsHTML}
+        </tbody>
+      </table>
     `;
 
     els.detailsWorkoutBody.appendChild(card);
