@@ -584,10 +584,10 @@ async function updatePreviousSessionInfo(exerciseId) {
   try {
     const prevDetails = await getPreviousSessionDetails(exerciseId);
     if (prevDetails && prevDetails.sets.length > 0) {
-      const shortDate = formatShortDate(new Date(prevDetails.workout.date));
+      const dateLabel = formatPrevSessionDate(prevDetails.workout.date);
       const formattedSets = formatPreviousSets(prevDetails.sets);
       if (formattedSets) {
-        infoEl.textContent = `Ant. (${shortDate}): ${formattedSets}`;
+        infoEl.textContent = `Ant. (${dateLabel}): ${formattedSets}`;
         return;
       }
     }
@@ -596,6 +596,18 @@ async function updatePreviousSessionInfo(exerciseId) {
     console.error('Error fetching previous session details:', err);
     infoEl.textContent = '';
   }
+}
+
+function formatPrevSessionDate(dateString) {
+  const date = new Date(dateString);
+  const weekday = date.toLocaleString('es-AR', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    weekday: 'long'
+  });
+  const day = date.toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit' });
+  const month = date.toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', month: '2-digit' });
+  const capitalizedWeekday = weekday.charAt(0).toUpperCase() + weekday.slice(1);
+  return `${capitalizedWeekday} ${day}/${month}`;
 }
 
 async function deleteSet(setId, exerciseId) {

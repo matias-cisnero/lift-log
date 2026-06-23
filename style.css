@@ -999,3 +999,21 @@ input:focus, select:focus {
   cursor: pointer;
   accent-color: var(--accent-primary);
 }
+
+/* Fix height for select exercise modal to avoid height changes on filter */
+#modal-select-exercise .modal-content {
+  height: 80vh;
+}
+
+#modal-select-exercise .modal-body {
+  display: flex;
+  flex-direction: column;
+  overflow-y: hidden; /* Avoid double scrollbars, only list should scroll */
+}
+
+#modal-select-exercise .modal-exercise-list {
+  flex: 1;
+  max-height: none; /* Let flexbox control the height */
+  overflow-y: auto;
+}
+
