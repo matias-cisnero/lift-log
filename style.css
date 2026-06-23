@@ -518,7 +518,7 @@ input:focus, select:focus {
 .active-workout-meta {
   margin-bottom: 14px;
   display: block;
-  padding: 10px 12px;
+  padding: 0;
 }
 
 .active-workout-meta .form-group {
@@ -533,11 +533,12 @@ input:focus, select:focus {
 }
 
 .exercise-log-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-md);
-  padding: 12px;
-  box-shadow: var(--card-shadow);
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  margin-bottom: 16px;
 }
 
 .exercise-log-header {
