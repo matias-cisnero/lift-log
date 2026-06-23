@@ -528,8 +528,8 @@ input:focus, select:focus {
 .exercises-log-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
   margin-bottom: 16px;
+  /* Gap removed by hand */
 }
 
 .exercise-log-card {
@@ -545,8 +545,7 @@ input:focus, select:focus {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  padding-bottom: 6px;
+  /* border-bottom and padding-bottom removed by hand */
 }
 
 .exercise-log-title {
@@ -555,16 +554,60 @@ input:focus, select:focus {
   color: var(--accent-primary-light);
 }
 
-.btn-remove-exercise-log {
-  background: none;
-  border: none;
-  color: var(--text-muted);
+/* Exercise Log Actions Header Button Layout */
+.exercise-log-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px; /* Generous gap to prevent accidental delete click */
+}
+
+.btn-add-set-row {
+  background-color: var(--accent-primary-glow) !important;
+  border: 1px solid var(--border-hover) !important;
+  color: var(--accent-primary-light) !important;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  padding: 2px;
+  border-radius: var(--border-radius-sm);
+  padding: 0;
+  transition: var(--transition-fast);
+  box-shadow: none !important;
+}
+
+.btn-add-set-row:hover {
+  background-color: var(--accent-primary) !important;
+  color: #fff !important;
+}
+
+.btn-add-set-row i {
+  width: 14px;
+  height: 14px;
+}
+
+.btn-remove-exercise-log {
+  background: none !important;
+  border: none !important;
+  color: var(--text-muted) !important;
+  cursor: pointer;
+  padding: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-fast);
+  box-shadow: none !important;
 }
 
 .btn-remove-exercise-log:hover {
-  color: var(--accent-danger);
+  color: var(--accent-danger) !important;
+  background: none !important;
+}
+
+.btn-remove-exercise-log i {
+  width: 14px;
+  height: 14px;
 }
 
 /* Series Spreadsheet Grid - Mini Tables */
@@ -676,7 +719,7 @@ input:focus, select:focus {
   margin-top: 4px;
 }
 
-/* Modals */
+/* Modals - Tall optimization for mobile height */
 .modal {
   position: fixed;
   top: 0;
@@ -714,7 +757,7 @@ input:focus, select:focus {
   border-radius: var(--border-radius-md);
   width: 95%;
   max-width: 420px;
-  max-height: 80vh;
+  max-height: 90vh; /* Increased to exploit tall screens */
   display: flex;
   flex-direction: column;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
@@ -770,7 +813,7 @@ input:focus, select:focus {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 220px;
+  max-height: 55vh; /* Increased list viewport space to view many exercises at once */
   overflow-y: auto;
 }
 

@@ -270,9 +270,14 @@ function renderExerciseLogCard(exercise, sets = []) {
   card.innerHTML = `
     <div class="exercise-log-header">
       <span class="exercise-log-title">${exercise.name}</span>
-      <button class="btn-remove-exercise-log" data-exercise-id="${exercise.id}">
-        <i data-lucide="trash-2"></i>
-      </button>
+      <div class="exercise-log-actions">
+        <button class="btn-add-set-row" data-exercise-id="${exercise.id}" title="Agregar Serie">
+          <i data-lucide="plus"></i>
+        </button>
+        <button class="btn-remove-exercise-log" data-exercise-id="${exercise.id}" title="Eliminar Ejercicio">
+          <i data-lucide="trash-2"></i>
+        </button>
+      </div>
     </div>
     <table class="sets-table">
       <thead>
@@ -287,9 +292,6 @@ function renderExerciseLogCard(exercise, sets = []) {
         <!-- Dynamically filled with tr rows -->
       </tbody>
     </table>
-    <button class="btn btn-secondary btn-block btn-sm btn-add-set-row" data-exercise-id="${exercise.id}">
-      <i data-lucide="plus"></i> Agregar Serie
-    </button>
   `;
 
   els.activeWorkoutExercisesList.appendChild(card);
@@ -360,27 +362,38 @@ function renderSetRow(container, exerciseId, set, setNumber) {
 }
 
 async function addSetToExercise(exerciseId) {
-  // Query previous sets for this exercise to auto-fill weight and reps from last session (progressive overload!)
-  let defaultWeight = '';
-  let defaultReps = '';
+  let defaultWeight = undefined;
+  let defaultReps = undefined;
 
-  // Get last set logged for this exercise in any workout
-  const lastSet = await db.sets
-    .where('exerciseId').equals(exerciseId)
-    .and(s => s.workoutId !== activeWorkout.id)
+  // 1. Query the last set logged for this exercise in the current workout
+  const lastSetInCurrentWorkout = await db.sets
+    .where('workoutId').equals(activeWorkout.id)
+    .and(s => s.exerciseId === exerciseId)
     .reverse()
     .first();
 
-  if (lastSet) {
-    defaultWeight = lastSet.weight || '';
-    defaultReps = lastSet.reps || '';
+  if (lastSetInCurrentWorkout) {
+    defaultWeight = lastSetInCurrentWorkout.weight;
+    defaultReps = lastSetInCurrentWorkout.reps;
+  } else {
+    // 2. Query previous sets for this exercise to auto-fill weight and reps from last session (progressive overload!)
+    const lastSetInPreviousWorkout = await db.sets
+      .where('exerciseId').equals(exerciseId)
+      .and(s => s.workoutId !== activeWorkout.id)
+      .reverse()
+      .first();
+
+    if (lastSetInPreviousWorkout) {
+      defaultWeight = lastSetInPreviousWorkout.weight;
+      defaultReps = lastSetInPreviousWorkout.reps;
+    }
   }
 
   const setId = await db.sets.add({
     workoutId: activeWorkout.id,
     exerciseId: exerciseId,
-    weight: defaultWeight !== '' ? parseFloat(defaultWeight) : undefined,
-    reps: defaultReps !== '' ? parseInt(defaultReps) : undefined
+    weight: defaultWeight,
+    reps: defaultReps
   });
 
   const container = document.getElementById(`sets-list-${exerciseId}`);
