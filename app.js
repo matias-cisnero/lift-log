@@ -336,7 +336,10 @@ function renderExerciseLogCard(exercise, sets = []) {
   
   card.innerHTML = `
     <div class="exercise-log-header">
-      <span class="exercise-log-title">${exercise.name}</span>
+      <div style="display: flex; flex-direction: column; gap: 2px;">
+        <span class="exercise-log-title">${exercise.name}</span>
+        <span class="prev-session-info text-muted" id="prev-session-${exercise.id}"></span>
+      </div>
       <div class="exercise-log-actions">
         <button class="btn-add-set-row" data-exercise-id="${exercise.id}" title="Agregar Serie">
           <i data-lucide="plus"></i>
@@ -384,6 +387,9 @@ function renderExerciseLogCard(exercise, sets = []) {
   card.querySelector('.btn-add-set-row').addEventListener('click', () => {
     addSetToExercise(exercise.id);
   });
+
+  // Load previous session info asynchronously
+  updatePreviousSessionInfo(exercise.id);
 }
 
 function renderSetRow(container, exerciseId, set, setNumber) {
@@ -421,6 +427,48 @@ function renderSetRow(container, exerciseId, set, setNumber) {
 
   weightInput.addEventListener('input', debounce(saveSetData, 800));
   repsInput.addEventListener('input', debounce(saveSetData, 800));
+
+  // Immediate save on blur
+  weightInput.addEventListener('blur', saveSetData);
+  repsInput.addEventListener('blur', saveSetData);
+
+  // Keyboard navigation: Enter in weight focuses reps
+  weightInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.keyCode === 13) {
+      e.preventDefault();
+      repsInput.focus();
+      try {
+        repsInput.select();
+      } catch (err) {}
+    }
+  });
+
+  // Keyboard navigation & auto-row creation: Enter in reps adds a new set row
+  repsInput.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter' || e.keyCode === 13) {
+      e.preventDefault();
+      
+      // Save current input data immediately
+      await saveSetData();
+      
+      // Add new set and get its ID
+      const newSetId = await addSetToExercise(exerciseId);
+      
+      // Focus and select the new weight input
+      setTimeout(() => {
+        const newRow = document.getElementById(`set-row-${newSetId}`);
+        if (newRow) {
+          const newWeightInput = newRow.querySelector('.set-weight');
+          if (newWeightInput) {
+            newWeightInput.focus();
+            try {
+              newWeightInput.select();
+            } catch (err) {}
+          }
+        }
+      }, 50);
+    }
+  });
 
   // Delete set handler
   row.querySelector('.btn-delete-set').addEventListener('click', async (e) => {
@@ -470,6 +518,84 @@ async function addSetToExercise(exerciseId) {
   renderSetRow(container, exerciseId, newSet, setNumber);
   
   lucide.createIcons();
+
+  return setId;
+}
+
+// Helpers for Previous Session Display
+async function getPreviousSessionDetails(exerciseId) {
+  const allSetsForExercise = await db.sets
+    .where('exerciseId').equals(exerciseId)
+    .toArray();
+  
+  const pastSets = allSetsForExercise.filter(s => !activeWorkout || s.workoutId !== activeWorkout.id);
+  if (pastSets.length === 0) return null;
+
+  const workoutIds = [...new Set(pastSets.map(s => s.workoutId))];
+  const workouts = await db.workouts.bulkGet(workoutIds);
+  const completedWorkouts = workouts
+    .filter(w => w && w.status === 'completed')
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  if (completedWorkouts.length === 0) return null;
+
+  const lastWorkout = completedWorkouts[0];
+  const lastWorkoutSets = pastSets.filter(s => s.workoutId === lastWorkout.id);
+  lastWorkoutSets.sort((a, b) => a.id - b.id);
+
+  return { workout: lastWorkout, sets: lastWorkoutSets };
+}
+
+function formatPreviousSets(sets) {
+  if (!sets || sets.length === 0) return '';
+
+  const groups = [];
+  let currentGroup = null;
+
+  sets.forEach(set => {
+    const weight = set.weight;
+    const reps = set.reps;
+    if (weight === undefined || reps === undefined) return;
+
+    if (currentGroup && currentGroup.weight === weight) {
+      currentGroup.reps.push(reps);
+    } else {
+      if (currentGroup) {
+        groups.push(currentGroup);
+      }
+      currentGroup = {
+        weight: weight,
+        reps: [reps]
+      };
+    }
+  });
+
+  if (currentGroup) {
+    groups.push(currentGroup);
+  }
+
+  return groups.map(g => `${g.weight}kg x ${g.reps.join(',')}`).join(' | ');
+}
+
+async function updatePreviousSessionInfo(exerciseId) {
+  const infoEl = document.getElementById(`prev-session-${exerciseId}`);
+  if (!infoEl) return;
+
+  try {
+    const prevDetails = await getPreviousSessionDetails(exerciseId);
+    if (prevDetails && prevDetails.sets.length > 0) {
+      const shortDate = formatShortDate(new Date(prevDetails.workout.date));
+      const formattedSets = formatPreviousSets(prevDetails.sets);
+      if (formattedSets) {
+        infoEl.textContent = `Ant. (${shortDate}): ${formattedSets}`;
+        return;
+      }
+    }
+    infoEl.textContent = '';
+  } catch (err) {
+    console.error('Error fetching previous session details:', err);
+    infoEl.textContent = '';
+  }
 }
 
 async function deleteSet(setId, exerciseId) {

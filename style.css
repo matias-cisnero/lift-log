@@ -555,6 +555,14 @@ input:focus, select:focus {
   color: var(--accent-primary-light);
 }
 
+.prev-session-info {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: normal;
+  display: block;
+  margin-top: 2px;
+}
+
 /* Exercise Log Actions Header Button Layout */
 .exercise-log-actions {
   display: flex;
