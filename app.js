@@ -5,8 +5,7 @@ const db = new Dexie('LiftLogDB');
 db.version(1).stores({
   exercises: '++id, &name',
   workouts: '++id, date, status', // status: 'active' or 'completed'
-  sets: '++id, workoutId, exerciseId',
-  bodyweight: '++id, date'
+  sets: '++id, workoutId, exerciseId'
 });
 
 // Default exercise presets
@@ -28,7 +27,6 @@ let activeWorkout = null;
 let activeWorkoutExercises = []; // array of exercise objects in current workout
 let chartVolumeInstance = null;
 let chartExerciseInstance = null;
-let chartBodyweightInstance = null;
 let activeExerciseMetric = '1rm'; // default metric for exercise progress chart
 
 // 3. DOM ELEMENTS
@@ -43,8 +41,8 @@ const els = {
   btnStartWorkout: document.getElementById('btn-start-workout'),
   btnCancelWorkout: document.getElementById('btn-cancel-workout'),
   btnFinishWorkout: document.getElementById('btn-finish-workout'),
-  workoutNameInput: document.getElementById('workout-name'),
   workoutDateInput: document.getElementById('workout-date'),
+  activeWorkoutTitleDate: document.getElementById('active-workout-title-date'),
   activeWorkoutExercisesList: document.getElementById('active-workout-exercises'),
   btnAddExerciseToWorkout: document.getElementById('btn-add-exercise-to-workout'),
   workoutsHistoryList: document.getElementById('workouts-history-list'),
@@ -63,15 +61,6 @@ const els = {
   statWeeklyVolume: document.getElementById('stat-weekly-volume'),
   progressExerciseSelect: document.getElementById('progress-exercise-select'),
   chartTabBtns: document.querySelectorAll('.chart-tab-btn'),
-
-  // Weight View
-  btnShowAddWeight: document.getElementById('btn-show-add-weight'),
-  addWeightFormCard: document.getElementById('add-weight-form-card'),
-  weightValue: document.getElementById('weight-value'),
-  weightDate: document.getElementById('weight-date'),
-  btnCancelAddWeight: document.getElementById('btn-cancel-add-weight'),
-  btnSaveWeight: document.getElementById('btn-save-weight'),
-  weightHistoryTbody: document.getElementById('weight-history-tbody'),
 
   // Settings View
   btnExportJson: document.getElementById('btn-export-json'),
@@ -103,7 +92,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupNavigation();
   setupWorkoutListeners();
   setupExerciseListeners();
-  setupWeightListeners();
   setupSettingsListeners();
   setupModalListeners();
 
@@ -164,8 +152,6 @@ async function initViewData(viewId) {
     await loadExercisesList();
   } else if (viewId === 'progress') {
     await initProgressView();
-  } else if (viewId === 'weight') {
-    await initWeightView();
   }
 }
 
@@ -175,7 +161,6 @@ function setupWorkoutListeners() {
   els.btnStartWorkout.addEventListener('click', startNewWorkout);
 
   // Auto-save metadata on change
-  els.workoutNameInput.addEventListener('input', debounce(saveActiveWorkoutMeta, 1000));
   els.workoutDateInput.addEventListener('change', saveActiveWorkoutMeta);
 
   // Add exercise to active workout
@@ -193,11 +178,13 @@ async function checkActiveWorkout() {
   const inProgress = await db.workouts.where('status').equals('active').first();
   if (inProgress) {
     activeWorkout = inProgress;
-    els.workoutNameInput.value = activeWorkout.name || '';
     
     // Format date for datetime-local input (YYYY-MM-DDTHH:MM)
     const localDate = new Date(activeWorkout.date);
     els.workoutDateInput.value = formatDateForInput(localDate);
+
+    // Update dynamic timezone subtitle
+    els.activeWorkoutTitleDate.textContent = formatWorkoutDate(activeWorkout.date);
 
     els.workoutsHomeContainer.classList.add('hidden');
     els.activeWorkoutContainer.classList.remove('hidden');
@@ -212,18 +199,16 @@ async function checkActiveWorkout() {
 
 async function startNewWorkout() {
   const now = new Date();
-  const defaultName = `Entrenamiento del ${getDayName(now)}`;
   
   const id = await db.workouts.add({
-    name: defaultName,
     date: now.toISOString(),
     status: 'active'
   });
 
-  activeWorkout = { id, name: defaultName, date: now.toISOString(), status: 'active' };
+  activeWorkout = { id, date: now.toISOString(), status: 'active' };
   
-  els.workoutNameInput.value = defaultName;
   els.workoutDateInput.value = formatDateForInput(now);
+  els.activeWorkoutTitleDate.textContent = formatWorkoutDate(now.toISOString());
 
   els.workoutsHomeContainer.classList.add('hidden');
   els.activeWorkoutContainer.classList.remove('hidden');
@@ -237,17 +222,15 @@ async function startNewWorkout() {
 async function saveActiveWorkoutMeta() {
   if (!activeWorkout) return;
   
-  const name = els.workoutNameInput.value.trim() || `Entrenamiento`;
   const dateVal = els.workoutDateInput.value;
   const isoDate = dateVal ? new Date(dateVal).toISOString() : new Date().toISOString();
 
   await db.workouts.update(activeWorkout.id, {
-    name: name,
     date: isoDate
   });
 
-  activeWorkout.name = name;
   activeWorkout.date = isoDate;
+  els.activeWorkoutTitleDate.textContent = formatWorkoutDate(isoDate);
 }
 
 // Load active exercises and their sets
@@ -537,8 +520,7 @@ async function loadWorkoutsHistory() {
     card.innerHTML = `
       <div class="workout-header">
         <div>
-          <h4 class="workout-title">${workout.name}</h4>
-          <span class="workout-date">${formatFullDate(new Date(workout.date))}</span>
+          <h4 class="workout-title">${formatWorkoutDate(workout.date)}</h4>
         </div>
         <span class="workout-volume-tag">${totalVolume.toLocaleString()} kg</span>
       </div>
@@ -695,7 +677,7 @@ async function loadExerciseSelectDropdown() {
 
   const exercises = await db.exercises.orderBy('name').toArray();
   
-  // Find which exercises actually have sets logged (so we don't display empty ones in progress by default)
+  // Find which exercises actually have sets logged
   const loggedExerciseIds = new Set();
   const allSets = await db.sets.toArray();
   allSets.forEach(s => loggedExerciseIds.add(s.exerciseId));
@@ -758,8 +740,7 @@ async function renderVolumeChart() {
       }
     });
 
-    const dateObj = new Date(w.date);
-    labels.push(formatShortDate(dateObj));
+    labels.push(formatShortDate(new Date(w.date)));
     data.push(volume);
   }
 
@@ -829,7 +810,6 @@ async function renderExerciseProgressChart() {
     let val = 0;
     if (activeExerciseMetric === '1rm') {
       // Epley Formula: 1RM = Weight * (1 + Reps/30)
-      // Pick max 1RM of the session
       let max1RM = 0;
       sets.forEach(s => {
         const est1RM = s.reps === 1 ? s.weight : s.weight * (1 + s.reps / 30);
@@ -837,14 +817,12 @@ async function renderExerciseProgressChart() {
       });
       val = Math.round(max1RM * 10) / 10;
     } else if (activeExerciseMetric === 'max-weight') {
-      // Max weight lifted in the session
       let maxW = 0;
       sets.forEach(s => {
         if (s.weight > maxW) maxW = s.weight;
       });
       val = maxW;
     } else if (activeExerciseMetric === 'volume') {
-      // Exercise specific volume
       let vol = 0;
       sets.forEach(s => {
         vol += s.weight * s.reps;
@@ -909,159 +887,7 @@ async function renderExerciseProgressChart() {
   });
 }
 
-// 9. WEIGHT VIEW LOGIC
-function setupWeightListeners() {
-  els.btnShowAddWeight.addEventListener('click', () => {
-    els.addWeightFormCard.classList.remove('hidden');
-    els.weightValue.focus();
-    els.weightDate.value = new Date().toISOString().split('T')[0];
-  });
-
-  els.btnCancelAddWeight.addEventListener('click', () => {
-    els.addWeightFormCard.classList.add('hidden');
-    els.weightValue.value = '';
-  });
-
-  els.btnSaveWeight.addEventListener('click', saveBodyweight);
-}
-
-async function initWeightView() {
-  await loadWeightHistoryTable();
-  await renderBodyweightChart();
-}
-
-async function loadWeightHistoryTable() {
-  els.weightHistoryTbody.innerHTML = '';
-  
-  // Sort weight entries by date descending
-  const weights = await db.bodyweight.reverse().sortBy('date');
-
-  if (weights.length === 0) {
-    els.weightHistoryTbody.innerHTML = `
-      <tr>
-        <td colspan="3" class="text-muted" style="text-align: center; padding: 30px;">
-          No hay registros de peso corporal.
-        </td>
-      </tr>
-    `;
-    return;
-  }
-
-  weights.forEach(w => {
-    const row = document.createElement('tr');
-    row.innerHTML = `
-      <td>${formatFullDate(new Date(w.date + 'T12:00:00'))}</td>
-      <td style="font-weight: 600;">${w.weight} kg</td>
-      <td>
-        <button class="btn-delete-exercise btn-delete-weight" data-id="${w.id}">
-          <i data-lucide="trash-2" style="width:16px;height:16px;"></i>
-        </button>
-      </td>
-    `;
-
-    row.querySelector('.btn-delete-weight').addEventListener('click', async () => {
-      if (confirm('¿Eliminar este registro de peso?')) {
-        await db.bodyweight.delete(w.id);
-        showToast('Peso corporal eliminado.');
-        await initWeightView();
-      }
-    });
-
-    els.weightHistoryTbody.appendChild(row);
-  });
-
-  lucide.createIcons();
-}
-
-async function saveBodyweight() {
-  const weight = parseFloat(els.weightValue.value);
-  const dateVal = els.weightDate.value;
-
-  if (isNaN(weight) || weight <= 0) {
-    showToast('Ingresa un peso corporal válido.', 'error');
-    return;
-  }
-  if (!dateVal) {
-    showToast('Selecciona una fecha.', 'error');
-    return;
-  }
-
-  // Check if weight record for this date already exists to prompt or overwrite
-  const existing = await db.bodyweight.where('date').equals(dateVal).first();
-  if (existing) {
-    if (confirm(`Ya tienes un peso registrado para el ${dateVal}. ¿Deseas actualizarlo?`)) {
-      await db.bodyweight.update(existing.id, { weight });
-      showToast('Registro de peso actualizado.');
-    } else {
-      return;
-    }
-  } else {
-    await db.bodyweight.add({
-      date: dateVal,
-      weight: weight
-    });
-    showToast('Peso corporal registrado.');
-  }
-
-  els.weightValue.value = '';
-  els.addWeightFormCard.classList.add('hidden');
-  await initWeightView();
-}
-
-async function renderBodyweightChart() {
-  if (chartBodyweightInstance) {
-    chartBodyweightInstance.destroy();
-  }
-
-  // Get weights sorted by date ascending
-  const weights = await db.bodyweight.orderBy('date').toArray();
-
-  if (weights.length === 0) {
-    return;
-  }
-
-  // Max recent 20 weight entries
-  const recentWeights = weights.slice(-20);
-  const labels = recentWeights.map(w => formatShortDate(new Date(w.date + 'T12:00:00')));
-  const datasetData = recentWeights.map(w => w.weight);
-
-  const ctx = document.getElementById('chart-bodyweight').getContext('2d');
-  chartBodyweightInstance = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: labels,
-      datasets: [{
-        label: 'Peso Corporal (kg)',
-        data: datasetData,
-        borderColor: '#10b981',
-        backgroundColor: 'rgba(16, 185, 129, 0.05)',
-        borderWidth: 2,
-        tension: 0.2,
-        pointBackgroundColor: '#10b981',
-        fill: true
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false }
-      },
-      scales: {
-        y: {
-          grid: { color: 'rgba(255, 255, 255, 0.05)' },
-          ticks: { color: '#64748b' }
-        },
-        x: {
-          grid: { display: false },
-          ticks: { color: '#64748b' }
-        }
-      }
-    }
-  });
-}
-
-// 10. SETTINGS LOGIC
+// 9. SETTINGS LOGIC
 function setupSettingsListeners() {
   els.btnExportJson.addEventListener('click', exportDatabaseToJson);
   els.btnTriggerImport.addEventListener('click', () => els.importJsonFile.click());
@@ -1079,11 +905,9 @@ function setupSettingsListeners() {
 
 async function exportDatabaseToJson() {
   try {
-    // Read all tables
     const exercises = await db.exercises.toArray();
     const workouts = await db.workouts.toArray();
     const sets = await db.sets.toArray();
-    const bodyweight = await db.bodyweight.toArray();
 
     const dataBackup = {
       app: 'LiftLog',
@@ -1091,8 +915,7 @@ async function exportDatabaseToJson() {
       exportDate: new Date().toISOString(),
       exercises,
       workouts,
-      sets,
-      bodyweight
+      sets
     };
 
     const jsonString = JSON.stringify(dataBackup, null, 2);
@@ -1125,33 +948,27 @@ async function importDatabaseFromJson(e) {
     try {
       const data = JSON.parse(event.target.result);
       
-      // Simple format verification
-      if (!data.exercises || !data.workouts || !data.sets || !data.bodyweight) {
+      if (!data.exercises || !data.workouts || !data.sets) {
         showToast('Formato de copia de seguridad inválido.', 'error');
         return;
       }
 
       const confirmRestore = confirm(
-        `Se importarán:\n- ${data.exercises.length} ejercicios\n- ${data.workouts.length} entrenamientos\n- ${data.sets.length} series\n- ${data.bodyweight.length} registros de peso.\n\nLos datos duplicados se sobrescribirán. ¿Deseas proceder?`
+        `Se importarán:\n- ${data.exercises.length} ejercicios\n- ${data.workouts.length} entrenamientos\n- ${data.sets.length} series.\n\nLos datos duplicados se sobrescribirán. ¿Deseas proceder?`
       );
 
       if (!confirmRestore) return;
 
-      // Import database transactions
-      await db.transaction('rw', [db.exercises, db.workouts, db.sets, db.bodyweight], async () => {
-        // We use bulkPut so entries with existing IDs are replaced/updated instead of throwing error
+      await db.transaction('rw', [db.exercises, db.workouts, db.sets], async () => {
         if (data.exercises.length > 0) await db.exercises.bulkPut(data.exercises);
         if (data.workouts.length > 0) await db.workouts.bulkPut(data.workouts);
         if (data.sets.length > 0) await db.sets.bulkPut(data.sets);
-        if (data.bodyweight.length > 0) await db.bodyweight.bulkPut(data.bodyweight);
       });
 
       showToast('¡Copia de seguridad restaurada con éxito!');
       
-      // Clear file input value
       els.importJsonFile.value = '';
       
-      // Reload current views
       const activeNavId = document.querySelector('.nav-item.active').getAttribute('data-view');
       await initViewData(activeNavId);
     } catch (err) {
@@ -1165,21 +982,19 @@ async function importDatabaseFromJson(e) {
 async function clearDatabase() {
   if (confirm('¿ATENCIÓN! Estás a punto de borrar TODOS tus datos definitivamente. No podrás recuperarlos a menos que tengas una copia de seguridad JSON. ¿Deseas continuar?')) {
     if (confirm('Por favor confirma por segunda vez. ¿Borrar absolutamente todo?')) {
-      await db.transaction('rw', [db.exercises, db.workouts, db.sets, db.bodyweight], async () => {
+      await db.transaction('rw', [db.exercises, db.workouts, db.sets], async () => {
         await db.exercises.clear();
         await db.workouts.clear();
         await db.sets.clear();
-        await db.bodyweight.clear();
       });
       showToast('Base de datos borrada por completo.');
-      // Re-seed defaults so app isn't completely empty next time
       await checkAndSeedPresets();
       window.location.reload();
     }
   }
 }
 
-// 11. MODAL WINDOWS DIALOGS LOGIC
+// 10. MODAL WINDOWS DIALOGS LOGIC
 function setupModalListeners() {
   // Select Exercise search in modal
   els.modalExerciseSearch.addEventListener('input', fillModalExercisesList);
@@ -1233,7 +1048,6 @@ async function fillModalExercisesList() {
     return;
   }
 
-  // Filter out exercises that are already added in the active workout to avoid duplicates in the same session
   const alreadyAddedIds = activeWorkoutExercises.map(e => e.id);
   const availableExercises = exercises.filter(e => !alreadyAddedIds.includes(e.id));
 
@@ -1286,7 +1100,7 @@ async function openWorkoutDetailsModal(workoutId) {
   const workout = await db.workouts.get(workoutId);
   if (!workout) return;
 
-  els.detailsWorkoutName.textContent = workout.name;
+  els.detailsWorkoutName.textContent = formatWorkoutDate(workout.date);
   els.detailsWorkoutBody.innerHTML = '<div style="text-align:center;padding:20px;">Cargando...</div>';
   
   els.modalWorkoutDetails.classList.add('active');
@@ -1361,7 +1175,7 @@ function closeAllModals() {
   });
 }
 
-// 12. UTILITY HELPER FUNCTIONS
+// 11. UTILITY HELPER FUNCTIONS
 function formatShortDate(dateObj) {
   // Return format DD/MM
   const day = String(dateObj.getDate()).padStart(2, '0');
@@ -1369,17 +1183,20 @@ function formatShortDate(dateObj) {
   return `${day}/${month}`;
 }
 
-function formatFullDate(dateObj) {
-  // Return format DD/MM/YYYY
-  const day = String(dateObj.getDate()).padStart(2, '0');
-  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-  const year = dateObj.getFullYear();
-  return `${day}/${month}/${year}`;
-}
-
-function getDayName(dateObj) {
-  const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-  return days[dateObj.getDay()];
+// Format date to local TZ Argentina displaying day of week + date + time
+function formatWorkoutDate(dateString) {
+  const date = new Date(dateString);
+  const formatted = date.toLocaleString('es-AR', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 }
 
 function formatDateForInput(date) {
@@ -1395,7 +1212,6 @@ function formatDateForInput(date) {
 
 // Toast Notification
 function showToast(message, type = 'success') {
-  // If a toast already exists, remove it
   const existingToast = document.querySelector('.toast-notification');
   if (existingToast) existingToast.remove();
 
@@ -1412,7 +1228,6 @@ function showToast(message, type = 'success') {
   document.body.appendChild(toast);
   lucide.createIcons();
 
-  // Animate slide-in and fade-out
   setTimeout(() => {
     toast.classList.add('show');
   }, 50);
@@ -1434,7 +1249,7 @@ function debounce(func, delay) {
   };
 }
 
-// Add CSS rules for toast notifications directly in JavaScript for ease of integration
+// Inject CSS rules for toast notifications directly in JavaScript for ease of integration
 const toastStyle = document.createElement('style');
 toastStyle.innerHTML = `
   .toast-notification {
