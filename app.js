@@ -5,21 +5,65 @@ const db = new Dexie('LiftLogDB');
 db.version(1).stores({
   exercises: '++id, &name',
   workouts: '++id, date, status', // status: 'active' or 'completed'
-  sets: '++id, workoutId, exerciseId'
+  sets: '++id, workoutId, exerciseId',
+  bodyweight: '++id, date'
 });
 
-// Default exercise presets
+// Muscle Groups Translation/Label mapping
+const MUSCLE_LABELS = {
+  cuadriceps: 'Cuádriceps',
+  isquiosurales: 'Isquiosurales',
+  pantorrilla: 'Pantorrilla',
+  gluteos: 'Glúteos',
+  abdomen: 'Abdomen',
+  espalda: 'Espalda',
+  pecho: 'Pecho',
+  biceps: 'Bíceps',
+  triceps: 'Tríceps',
+  'deltoides posterior': 'Deltoides Posterior',
+  'deltoides lateral': 'Deltoides Lateral',
+  'deltoides anterior': 'Deltoides Anterior',
+  antebrazo: 'Antebrazo',
+  'espalda baja': 'Espalda Baja'
+};
+
+// Default exercise presets with muscle group mappings (as requested by user)
 const DEFAULT_EXERCISES = [
-  'Sentadilla con Barra (Squat)',
-  'Press de Banca (Bench Press)',
-  'Peso Muerto (Deadlift)',
-  'Press Militar (Overhead Press)',
-  'Dominadas (Pull-ups)',
-  'Remo con Barra',
-  'Curl de Bíceps con Barra',
-  'Fondos en Paralelas (Dips)',
-  'Prensa de Piernas',
-  'Elevaciones Laterales'
+  // Empujes / Pecho
+  { name: 'Press Banca', primaryMuscle: 'pecho', secondaryMuscles: ['triceps', 'deltoides anterior'] },
+  { name: 'Press Banca Inclinado', primaryMuscle: 'pecho', secondaryMuscles: ['triceps', 'deltoides anterior'] },
+  { name: 'Press Inclinado con Mancuernas', primaryMuscle: 'pecho', secondaryMuscles: ['triceps', 'deltoides anterior'] },
+  { name: 'Press con Mancuernas', primaryMuscle: 'pecho', secondaryMuscles: ['triceps', 'deltoides anterior'] },
+  { name: 'Fondos', primaryMuscle: 'pecho', secondaryMuscles: ['triceps', 'deltoides posterior'] },
+  
+  // Tracciones / Espalda
+  { name: 'Dominadas', primaryMuscle: 'espalda', secondaryMuscles: ['biceps', 'deltoides posterior', 'antebrazo'] },
+  { name: 'Jalón al Pecho', primaryMuscle: 'espalda', secondaryMuscles: ['biceps', 'deltoides posterior', 'antebrazo'] },
+  { name: 'Remo con Barra', primaryMuscle: 'espalda', secondaryMuscles: ['biceps', 'deltoides posterior', 'antebrazo'] },
+  
+  // Hombros / Deltoides
+  { name: 'Elevaciones Laterales', primaryMuscle: 'deltoides lateral', secondaryMuscles: ['deltoides anterior'] },
+  { name: 'Press militar', primaryMuscle: 'deltoides anterior', secondaryMuscles: ['deltoides lateral', 'pecho'] },
+  
+  // Brazos
+  { name: 'Curl de Biceps con Barra', primaryMuscle: 'biceps', secondaryMuscles: [] },
+  { name: 'Curl Martillo', primaryMuscle: 'biceps', secondaryMuscles: ['antebrazo'] },
+  { name: 'Extensión de triceps', primaryMuscle: 'triceps', secondaryMuscles: [] },
+  { name: 'Press Frances con Barra', primaryMuscle: 'triceps', secondaryMuscles: [] },
+  { name: 'Press frances con mancuerna', primaryMuscle: 'triceps', secondaryMuscles: [] },
+  
+  // Piernas
+  { name: 'Sentadilla con Barra', primaryMuscle: 'cuadriceps', secondaryMuscles: ['gluteos', 'espalda baja'] },
+  { name: 'Peso muerto rumano', primaryMuscle: 'isquiosurales', secondaryMuscles: ['gluteos', 'espalda baja', 'antebrazo'] },
+  { name: 'Prensa 45', primaryMuscle: 'cuadriceps', secondaryMuscles: ['gluteos'] },
+  { name: 'Extension de Cuadriceps', primaryMuscle: 'cuadriceps', secondaryMuscles: [] },
+  { name: 'Curl Femoral', primaryMuscle: 'isquiosurales', secondaryMuscles: [] },
+  { name: 'Elevacion de talones', primaryMuscle: 'pantorrilla', secondaryMuscles: [] },
+  
+  // Abdomen
+  { name: 'Elevacion de piernas', primaryMuscle: 'abdomen', secondaryMuscles: [] },
+  { name: 'Rueda abdominal', primaryMuscle: 'abdomen', secondaryMuscles: [] },
+  { name: 'Crunch en polea', primaryMuscle: 'abdomen', secondaryMuscles: [] }
 ];
 
 // 2. STATE VARIABLES
@@ -27,6 +71,8 @@ let activeWorkout = null;
 let activeWorkoutExercises = []; // array of exercise objects in current workout
 let chartVolumeInstance = null;
 let chartExerciseInstance = null;
+let chartMusclesInstance = null;
+let chartBodyweightInstance = null;
 let activeExerciseMetric = '1rm'; // default metric for exercise progress chart
 
 // 3. DOM ELEMENTS
@@ -62,6 +108,15 @@ const els = {
   progressExerciseSelect: document.getElementById('progress-exercise-select'),
   chartTabBtns: document.querySelectorAll('.chart-tab-btn'),
 
+  // Weight View
+  btnShowAddWeight: document.getElementById('btn-show-add-weight'),
+  addWeightFormCard: document.getElementById('add-weight-form-card'),
+  weightValue: document.getElementById('weight-value'),
+  weightDate: document.getElementById('weight-date'),
+  btnCancelAddWeight: document.getElementById('btn-cancel-add-weight'),
+  btnSaveWeight: document.getElementById('btn-save-weight'),
+  weightHistoryTbody: document.getElementById('weight-history-tbody'),
+
   // Settings View
   btnExportJson: document.getElementById('btn-export-json'),
   btnTriggerImport: document.getElementById('btn-trigger-import'),
@@ -92,6 +147,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupNavigation();
   setupWorkoutListeners();
   setupExerciseListeners();
+  setupWeightListeners();
   setupSettingsListeners();
   setupModalListeners();
 
@@ -114,8 +170,17 @@ async function checkAndSeedPresets() {
 }
 
 async function seedDefaultExercises() {
-  const exercises = DEFAULT_EXERCISES.map(name => ({ name }));
-  await db.exercises.bulkAdd(exercises);
+  for (const preset of DEFAULT_EXERCISES) {
+    const existing = await db.exercises.where('name').equals(preset.name).first();
+    if (existing) {
+      await db.exercises.update(existing.id, {
+        primaryMuscle: preset.primaryMuscle,
+        secondaryMuscles: preset.secondaryMuscles
+      });
+    } else {
+      await db.exercises.add(preset);
+    }
+  }
   showToast('Ejercicios predeterminados cargados correctamente.');
 }
 
@@ -152,6 +217,8 @@ async function initViewData(viewId) {
     await loadExercisesList();
   } else if (viewId === 'progress') {
     await initProgressView();
+  } else if (viewId === 'weight') {
+    await initWeightView();
   }
 }
 
@@ -376,7 +443,7 @@ async function addSetToExercise(exerciseId) {
     defaultWeight = lastSetInCurrentWorkout.weight;
     defaultReps = lastSetInCurrentWorkout.reps;
   } else {
-    // 2. Query previous sets for this exercise to auto-fill weight and reps from last session (progressive overload!)
+    // 2. Query previous sets for this exercise to auto-fill weight and reps from last session
     const lastSetInPreviousWorkout = await db.sets
       .where('exerciseId').equals(exerciseId)
       .and(s => s.workoutId !== activeWorkout.id)
@@ -571,6 +638,12 @@ function setupExerciseListeners() {
   els.btnCancelAddExercise.addEventListener('click', () => {
     els.addExerciseFormCard.classList.add('hidden');
     els.newExerciseName.value = '';
+    const primarySelect = document.getElementById('new-exercise-primary');
+    if (primarySelect) primarySelect.value = '';
+    const secondariesDiv = document.getElementById('new-exercise-secondaries');
+    if (secondariesDiv) {
+      secondariesDiv.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    }
   });
 
   els.btnSaveExercise.addEventListener('click', saveNewExercise);
@@ -602,8 +675,24 @@ async function loadExercisesList() {
   exercises.forEach(exercise => {
     const item = document.createElement('div');
     item.className = 'exercise-item';
+    
+    // Format muscles tags display
+    let musclesText = '';
+    if (exercise.primaryMuscle) {
+      musclesText = MUSCLE_LABELS[exercise.primaryMuscle] || exercise.primaryMuscle;
+      if (Array.isArray(exercise.secondaryMuscles) && exercise.secondaryMuscles.length > 0) {
+        const secText = exercise.secondaryMuscles.map(sm => MUSCLE_LABELS[sm] || sm).join(', ');
+        musclesText += ` • Secundarios: ${secText}`;
+      }
+    } else {
+      musclesText = 'Sin grupo muscular asignado';
+    }
+
     item.innerHTML = `
-      <span class="exercise-item-name">${exercise.name}</span>
+      <div>
+        <span class="exercise-item-name">${exercise.name}</span>
+        <span class="exercise-item-muscles" style="display:block; font-size:11px; color:var(--text-muted); margin-top:2px;">${musclesText}</span>
+      </div>
       <button class="btn-delete-exercise" data-id="${exercise.id}">
         <i data-lucide="trash-2"></i>
       </button>
@@ -627,9 +716,31 @@ async function saveNewExercise() {
     return;
   }
 
+  const primarySelect = document.getElementById('new-exercise-primary');
+  const primaryMuscle = primarySelect ? primarySelect.value : '';
+  
+  // Secondary muscles
+  const secondariesDiv = document.getElementById('new-exercise-secondaries');
+  const secondaryMuscles = [];
+  if (secondariesDiv) {
+    const checkedCheckboxes = secondariesDiv.querySelectorAll('input[type="checkbox"]:checked');
+    checkedCheckboxes.forEach(cb => {
+      secondaryMuscles.push(cb.value);
+    });
+  }
+
   try {
-    await db.exercises.add({ name });
+    await db.exercises.add({
+      name,
+      primaryMuscle: primaryMuscle || undefined,
+      secondaryMuscles: secondaryMuscles.length > 0 ? secondaryMuscles : undefined
+    });
+    
     els.newExerciseName.value = '';
+    if (primarySelect) primarySelect.value = '';
+    if (secondariesDiv) {
+      secondariesDiv.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    }
     els.addExerciseFormCard.classList.add('hidden');
     showToast('Ejercicio creado correctamente.');
     await loadExercisesList();
@@ -666,6 +777,7 @@ async function initProgressView() {
   await loadExerciseSelectDropdown();
   await renderVolumeChart();
   await renderExerciseProgressChart();
+  await renderMusclesWeeklyChart();
 }
 
 async function loadStatsOverview() {
@@ -774,12 +886,12 @@ async function renderVolumeChart() {
       datasets: [{
         label: 'Volumen (kg)',
         data: data,
-        borderColor: '#6366f1',
-        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+        borderColor: '#f97316', // Orange theme
+        backgroundColor: 'rgba(249, 115, 22, 0.1)',
         borderWidth: 3,
         tension: 0.3,
         fill: true,
-        pointBackgroundColor: '#6366f1',
+        pointBackgroundColor: '#f97316',
         pointHoverRadius: 7
       }]
     },
@@ -857,8 +969,8 @@ async function renderExerciseProgressChart() {
   }
 
   let labelText = '';
-  let color = '#3b82f6';
-  let bgColor = 'rgba(59, 130, 246, 0.1)';
+  let color = '#f97316'; // Orange
+  let bgColor = 'rgba(249, 115, 22, 0.1)';
 
   if (activeExerciseMetric === '1rm') {
     labelText = '1RM Estimado (kg)';
@@ -909,7 +1021,250 @@ async function renderExerciseProgressChart() {
   });
 }
 
-// 9. SETTINGS LOGIC
+// Chart 3: Weekly Series Count by Muscle Group (Primary = 1.0, Secondary = 0.5)
+async function renderMusclesWeeklyChart() {
+  if (chartMusclesInstance) {
+    chartMusclesInstance.destroy();
+  }
+
+  // Get date 7 days ago
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  // Fetch completed workouts in the last 7 days
+  const workouts = await db.workouts.where('status').equals('completed').toArray();
+  const recentWorkouts = workouts.filter(w => new Date(w.date) >= sevenDaysAgo);
+
+  // Cache exercises map for fast lookup
+  const exercises = await db.exercises.toArray();
+  const exercisesMap = new Map(exercises.map(e => [e.id, e]));
+
+  // Initialize count map for all 14 muscle groups
+  const musclesMap = {};
+  Object.keys(MUSCLE_LABELS).forEach(muscle => {
+    musclesMap[muscle] = 0;
+  });
+
+  // Count sets
+  for (const w of recentWorkouts) {
+    const sets = await db.sets.where('workoutId').equals(w.id).toArray();
+    sets.forEach(s => {
+      // Only count sets with inputs filled
+      if (s.weight !== undefined && s.reps !== undefined) {
+        const exercise = exercisesMap.get(s.exerciseId);
+        if (exercise) {
+          if (exercise.primaryMuscle && musclesMap[exercise.primaryMuscle] !== undefined) {
+            musclesMap[exercise.primaryMuscle] += 1;
+          }
+          if (Array.isArray(exercise.secondaryMuscles)) {
+            exercise.secondaryMuscles.forEach(sm => {
+              if (musclesMap[sm] !== undefined) {
+                musclesMap[sm] += 0.5; // Secondary muscles count 50%
+              }
+            });
+          }
+        }
+      }
+    });
+  }
+
+  // Convert map to sorted array
+  const sortedMuscles = Object.keys(musclesMap)
+    .map(key => ({ key, value: musclesMap[key] }))
+    .sort((a, b) => b.value - a.value);
+
+  // Filter out muscles with zero series to keep chart compact
+  const activeMuscles = sortedMuscles.filter(m => m.value > 0);
+  
+  // If nothing is logged, show all muscles at 0
+  const chartData = activeMuscles.length > 0 ? activeMuscles : sortedMuscles;
+  const labels = chartData.map(m => MUSCLE_LABELS[m.key]);
+  const data = chartData.map(m => m.value);
+
+  const ctx = document.getElementById('chart-muscles-weekly').getContext('2d');
+  chartMusclesInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Series Semanales',
+        data: data,
+        backgroundColor: 'rgba(249, 115, 22, 0.15)',
+        borderColor: '#f97316',
+        borderWidth: 1.5,
+        borderRadius: 2
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255, 255, 255, 0.05)' },
+          ticks: { color: '#64748b', stepSize: 1 },
+          beginAtZero: true
+        },
+        y: {
+          grid: { display: false },
+          ticks: { color: '#64748b', font: { size: 10 } }
+        }
+      }
+    }
+  });
+}
+
+// 9. WEIGHT VIEW LOGIC (RESTORED!)
+function setupWeightListeners() {
+  els.btnShowAddWeight.addEventListener('click', () => {
+    els.addWeightFormCard.classList.remove('hidden');
+    els.weightValue.focus();
+    els.weightDate.value = new Date().toISOString().split('T')[0];
+  });
+
+  els.btnCancelAddWeight.addEventListener('click', () => {
+    els.addWeightFormCard.classList.add('hidden');
+    els.weightValue.value = '';
+  });
+
+  els.btnSaveWeight.addEventListener('click', saveBodyweight);
+}
+
+async function initWeightView() {
+  await loadWeightHistoryTable();
+  await renderBodyweightChart();
+}
+
+async function loadWeightHistoryTable() {
+  els.weightHistoryTbody.innerHTML = '';
+  const weights = await db.bodyweight.reverse().sortBy('date');
+
+  if (weights.length === 0) {
+    els.weightHistoryTbody.innerHTML = `
+      <tr>
+        <td colspan="3" class="text-muted" style="text-align: center; padding: 20px;">
+          No hay registros de peso corporal.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  weights.forEach(w => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td style="padding: 8px 12px; font-size:13px;">${w.date.split('-').reverse().join('/')}</td>
+      <td style="padding: 8px 12px; font-size:13px; font-weight: 600;">${w.weight} kg</td>
+      <td style="padding: 8px 12px;">
+        <button class="btn-delete-exercise btn-delete-weight" data-id="${w.id}">
+          <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
+        </button>
+      </td>
+    `;
+
+    row.querySelector('.btn-delete-weight').addEventListener('click', async () => {
+      if (confirm('¿Eliminar este registro de peso?')) {
+        await db.bodyweight.delete(w.id);
+        showToast('Peso corporal eliminado.');
+        await initWeightView();
+      }
+    });
+
+    els.weightHistoryTbody.appendChild(row);
+  });
+
+  lucide.createIcons();
+}
+
+async function saveBodyweight() {
+  const weight = parseFloat(els.weightValue.value);
+  const dateVal = els.weightDate.value;
+
+  if (isNaN(weight) || weight <= 0) {
+    showToast('Ingresa un peso corporal válido.', 'error');
+    return;
+  }
+  if (!dateVal) {
+    showToast('Selecciona una fecha.', 'error');
+    return;
+  }
+
+  const existing = await db.bodyweight.where('date').equals(dateVal).first();
+  if (existing) {
+    if (confirm(`Ya tienes un peso registrado para el ${dateVal}. ¿Deseas actualizarlo?`)) {
+      await db.bodyweight.update(existing.id, { weight });
+      showToast('Registro de peso actualizado.');
+    } else {
+      return;
+    }
+  } else {
+    await db.bodyweight.add({
+      date: dateVal,
+      weight: weight
+    });
+    showToast('Peso corporal registrado.');
+  }
+
+  els.weightValue.value = '';
+  els.addWeightFormCard.classList.add('hidden');
+  await initWeightView();
+}
+
+async function renderBodyweightChart() {
+  if (chartBodyweightInstance) {
+    chartBodyweightInstance.destroy();
+  }
+
+  const weights = await db.bodyweight.orderBy('date').toArray();
+
+  if (weights.length === 0) {
+    return;
+  }
+
+  const recentWeights = weights.slice(-20);
+  const labels = recentWeights.map(w => formatShortDate(new Date(w.date + 'T12:00:00')));
+  const datasetData = recentWeights.map(w => w.weight);
+
+  const ctx = document.getElementById('chart-bodyweight').getContext('2d');
+  chartBodyweightInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Peso Corporal (kg)',
+        data: datasetData,
+        borderColor: '#10b981', // Green theme for weight
+        backgroundColor: 'rgba(16, 185, 129, 0.05)',
+        borderWidth: 2,
+        tension: 0.2,
+        pointBackgroundColor: '#10b981',
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        y: {
+          grid: { color: 'rgba(255, 255, 255, 0.05)' },
+          ticks: { color: '#64748b' }
+        },
+        x: {
+          grid: { display: false },
+          ticks: { color: '#64748b' }
+        }
+      }
+    }
+  });
+}
+
+// 10. SETTINGS LOGIC
 function setupSettingsListeners() {
   els.btnExportJson.addEventListener('click', exportDatabaseToJson);
   els.btnTriggerImport.addEventListener('click', () => els.importJsonFile.click());
@@ -930,6 +1285,7 @@ async function exportDatabaseToJson() {
     const exercises = await db.exercises.toArray();
     const workouts = await db.workouts.toArray();
     const sets = await db.sets.toArray();
+    const bodyweight = await db.bodyweight.toArray();
 
     const dataBackup = {
       app: 'LiftLog',
@@ -937,7 +1293,8 @@ async function exportDatabaseToJson() {
       exportDate: new Date().toISOString(),
       exercises,
       workouts,
-      sets
+      sets,
+      bodyweight
     };
 
     const jsonString = JSON.stringify(dataBackup, null, 2);
@@ -976,15 +1333,16 @@ async function importDatabaseFromJson(e) {
       }
 
       const confirmRestore = confirm(
-        `Se importarán:\n- ${data.exercises.length} ejercicios\n- ${data.workouts.length} entrenamientos\n- ${data.sets.length} series.\n\nLos datos duplicados se sobrescribirán. ¿Deseas proceder?`
+        `Se importarán:\n- ${data.exercises.length} ejercicios\n- ${data.workouts.length} entrenamientos\n- ${data.sets.length} series\n- ${data.bodyweight ? data.bodyweight.length : 0} pesos.\n\nLos datos duplicados se sobrescribirán. ¿Deseas proceder?`
       );
 
       if (!confirmRestore) return;
 
-      await db.transaction('rw', [db.exercises, db.workouts, db.sets], async () => {
+      await db.transaction('rw', [db.exercises, db.workouts, db.sets, db.bodyweight], async () => {
         if (data.exercises.length > 0) await db.exercises.bulkPut(data.exercises);
         if (data.workouts.length > 0) await db.workouts.bulkPut(data.workouts);
         if (data.sets.length > 0) await db.sets.bulkPut(data.sets);
+        if (data.bodyweight && data.bodyweight.length > 0) await db.bodyweight.bulkPut(data.bodyweight);
       });
 
       showToast('¡Copia de seguridad restaurada con éxito!');
@@ -1004,10 +1362,11 @@ async function importDatabaseFromJson(e) {
 async function clearDatabase() {
   if (confirm('¿ATENCIÓN! Estás a punto de borrar TODOS tus datos definitivamente. No podrás recuperarlos a menos que tengas una copia de seguridad JSON. ¿Deseas continuar?')) {
     if (confirm('Por favor confirma por segunda vez. ¿Borrar absolutamente todo?')) {
-      await db.transaction('rw', [db.exercises, db.workouts, db.sets], async () => {
+      await db.transaction('rw', [db.exercises, db.workouts, db.sets, db.bodyweight], async () => {
         await db.exercises.clear();
         await db.workouts.clear();
         await db.sets.clear();
+        await db.bodyweight.clear();
       });
       showToast('Base de datos borrada por completo.');
       await checkAndSeedPresets();
@@ -1016,7 +1375,7 @@ async function clearDatabase() {
   }
 }
 
-// 10. MODAL WINDOWS DIALOGS LOGIC
+// 11. MODAL WINDOWS DIALOGS LOGIC
 function setupModalListeners() {
   // Select Exercise search in modal
   els.modalExerciseSearch.addEventListener('input', fillModalExercisesList);
@@ -1085,7 +1444,14 @@ async function fillModalExercisesList() {
   availableExercises.forEach(e => {
     const div = document.createElement('div');
     div.className = 'modal-exercise-item';
-    div.textContent = e.name;
+    
+    // Format muscles line preview
+    let musclesPreview = '';
+    if (e.primaryMuscle) {
+      musclesPreview = ` (${MUSCLE_LABELS[e.primaryMuscle] || e.primaryMuscle})`;
+    }
+
+    div.textContent = e.name + musclesPreview;
     div.addEventListener('click', async () => {
       await selectExerciseForActiveWorkout(e.id);
       closeAllModals();
@@ -1206,7 +1572,7 @@ function closeAllModals() {
   });
 }
 
-// 11. UTILITY HELPER FUNCTIONS
+// 12. UTILITY HELPER FUNCTIONS
 function formatShortDate(dateObj) {
   // Return format DD/MM
   const day = String(dateObj.getDate()).padStart(2, '0');

@@ -111,12 +111,52 @@
         <!-- Add Exercise Form (hidden by default) -->
         <div id="add-exercise-form-card" class="card hidden mb-4">
           <h3>Crear Nuevo Ejercicio</h3>
-          <div class="form-row">
+          <div class="form-group mt-2">
+            <label for="new-exercise-name">Nombre del Ejercicio</label>
             <input type="text" id="new-exercise-name" placeholder="Ej. Sentadilla con Barra">
-            <div class="form-buttons">
-              <button id="btn-cancel-add-exercise" class="btn btn-secondary">Cancelar</button>
-              <button id="btn-save-exercise" class="btn btn-primary">Guardar</button>
+          </div>
+          <div class="form-group">
+            <label for="new-exercise-primary">Grupo Muscular Principal</label>
+            <select id="new-exercise-primary">
+              <option value="">-- Selecciona el principal --</option>
+              <option value="cuadriceps">Cuádriceps</option>
+              <option value="isquiosurales">Isquiosurales</option>
+              <option value="pantorrilla">Pantorrilla</option>
+              <option value="gluteos">Glúteos</option>
+              <option value="abdomen">Abdomen</option>
+              <option value="espalda">Espalda</option>
+              <option value="pecho">Pecho</option>
+              <option value="biceps">Bíceps</option>
+              <option value="triceps">Tríceps</option>
+              <option value="deltoides posterior">Deltoides Posterior</option>
+              <option value="deltoides lateral">Deltoides Lateral</option>
+              <option value="deltoides anterior">Deltoides Anterior</option>
+              <option value="antebrazo">Antebrazo</option>
+              <option value="espalda baja">Espalda Baja</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Grupos Musculares Secundarios</label>
+            <div id="new-exercise-secondaries" class="muscle-checkbox-group">
+              <label class="checkbox-container"><input type="checkbox" value="cuadriceps"> Cuádriceps</label>
+              <label class="checkbox-container"><input type="checkbox" value="isquiosurales"> Isquiosurales</label>
+              <label class="checkbox-container"><input type="checkbox" value="pantorrilla"> Pantorrilla</label>
+              <label class="checkbox-container"><input type="checkbox" value="gluteos"> Glúteos</label>
+              <label class="checkbox-container"><input type="checkbox" value="abdomen"> Abdomen</label>
+              <label class="checkbox-container"><input type="checkbox" value="espalda"> Espalda</label>
+              <label class="checkbox-container"><input type="checkbox" value="pecho"> Pecho</label>
+              <label class="checkbox-container"><input type="checkbox" value="biceps"> Bíceps</label>
+              <label class="checkbox-container"><input type="checkbox" value="triceps"> Tríceps</label>
+              <label class="checkbox-container"><input type="checkbox" value="deltoides posterior"> Deltoides Posterior</label>
+              <label class="checkbox-container"><input type="checkbox" value="deltoides lateral"> Deltoides Lateral</label>
+              <label class="checkbox-container"><input type="checkbox" value="deltoides anterior"> Deltoides Anterior</label>
+              <label class="checkbox-container"><input type="checkbox" value="antebrazo"> Antebrazo</label>
+              <label class="checkbox-container"><input type="checkbox" value="espalda baja"> Espalda Baja</label>
             </div>
+          </div>
+          <div class="form-buttons">
+            <button id="btn-cancel-add-exercise" class="btn btn-secondary">Cancelar</button>
+            <button id="btn-save-exercise" class="btn btn-primary">Guardar</button>
           </div>
         </div>
 
@@ -173,9 +213,70 @@
             <canvas id="chart-exercise-progress"></canvas>
           </div>
         </div>
+
+        <!-- Weekly Series by Muscle Group Chart -->
+        <div class="card chart-card mb-4">
+          <h3>Series Semanales por Grupo Muscular</h3>
+          <p class="text-muted mb-2">Las series en grupos musculares secundarios cuentan el 50% (0.5 series).</p>
+          <div class="chart-container" style="height: 380px;">
+            <canvas id="chart-muscles-weekly"></canvas>
+          </div>
+        </div>
       </section>
 
-      <!-- VIEW: WEIGHT REMOVED -->
+      <!-- VIEW: WEIGHT -->
+      <section id="view-weight" class="view-section">
+        <div class="section-header">
+          <h2>Peso Corporal</h2>
+          <button id="btn-show-add-weight" class="btn btn-primary btn-sm">
+            <i data-lucide="plus"></i> Registrar Peso
+          </button>
+        </div>
+
+        <!-- Log Weight Form (hidden by default) -->
+        <div id="add-weight-form-card" class="card hidden mb-4">
+          <h3>Registrar Peso Corporal</h3>
+          <div class="form-group">
+            <label for="weight-value">Peso (kg)</label>
+            <input type="number" step="0.1" id="weight-value" placeholder="Ej. 78.5">
+          </div>
+          <div class="form-group">
+            <label for="weight-date">Fecha</label>
+            <input type="date" id="weight-date">
+          </div>
+          <div class="form-buttons">
+            <button id="btn-cancel-add-weight" class="btn btn-secondary">Cancelar</button>
+            <button id="btn-save-weight" class="btn btn-primary">Registrar</button>
+          </div>
+        </div>
+
+        <!-- Bodyweight Chart -->
+        <div class="card chart-card mb-4">
+          <h3>Evolución del Peso</h3>
+          <div class="chart-container">
+            <canvas id="chart-bodyweight"></canvas>
+          </div>
+        </div>
+
+        <!-- Weight History Table -->
+        <div class="card">
+          <h3>Historial de Peso</h3>
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Peso (kg)</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="weight-history-tbody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
 
       <!-- VIEW: SETTINGS -->
       <section id="view-settings" class="view-section">
@@ -232,6 +333,10 @@
       <button class="nav-item" data-view="progress">
         <i data-lucide="trending-up"></i>
         <span>Progreso</span>
+      </button>
+      <button class="nav-item" data-view="weight">
+        <i data-lucide="scale"></i>
+        <span>Peso</span>
       </button>
       <button class="nav-item" data-view="settings">
         <i data-lucide="settings"></i>

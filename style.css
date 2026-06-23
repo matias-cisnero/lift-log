@@ -6,9 +6,9 @@
   --bg-tertiary: #1f2937;
   --bg-card: rgba(17, 24, 39, 0.85);
   
-  --accent-primary: #6366f1;
-  --accent-primary-light: #818cf8;
-  --accent-primary-glow: rgba(99, 102, 241, 0.2);
+  --accent-primary: #f97316;
+  --accent-primary-light: #fb923c;
+  --accent-primary-glow: rgba(249, 115, 22, 0.15);
   
   --accent-success: #10b981;
   --accent-success-light: #34d399;
@@ -23,7 +23,7 @@
   --text-muted: #9ca3af;
   
   --border-color: rgba(255, 255, 255, 0.08);
-  --border-hover: rgba(99, 102, 241, 0.35);
+  --border-hover: rgba(249, 115, 22, 0.35);
   
   --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
   --glass-blur: blur(8px);
@@ -154,7 +154,7 @@ body {
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  width: 25%; /* Adjusted since weight tab is removed */
+  width: 20%;
   gap: 2px;
   transition: var(--transition-normal);
   position: relative;
@@ -963,4 +963,31 @@ input:focus, select:focus {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Muscle Checkbox Group for Exercise Creation */
+.muscle-checkbox-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 6px;
+  max-height: 120px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  padding: 8px;
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-sm);
+}
+
+.checkbox-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.checkbox-container input {
+  cursor: pointer;
+  accent-color: var(--accent-primary);
 }
